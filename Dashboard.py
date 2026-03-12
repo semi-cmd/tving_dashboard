@@ -1,202 +1,265 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
 
-# --------------------------------------------------
-# PAGE CONFIG
-# --------------------------------------------------
+st.set_page_config(layout="wide")
 
-st.set_page_config(
-    page_title="TVING Retention Dashboard",
-    layout="wide"
-)
-
-# --------------------------------------------------
-# TVING DARK THEME
-# --------------------------------------------------
-
-st.markdown("""
-<style>
-
-.stApp {
-    background-color: #0e1117;
-    color: white;
-}
-
-[data-testid="stSidebar"] {
-    background-color: #151a23;
-}
-
-h1, h2, h3, h4 {
-    color: white;
-}
-
-p, span, label {
-    color: white;
-}
-
-.stMetric {
-    background-color: #1c2330;
-    padding: 20px;
-    border-radius: 10px;
-}
-
-</style>
-""", unsafe_allow_html=True)
-
-# --------------------------------------------------
+# ----------------------------
 # TITLE
-# --------------------------------------------------
+# ----------------------------
 
-st.title("🎬 TVING Retention Dashboard")
-
-st.markdown("""
-### OTT 사용자 행동 데이터 기반 이탈 분석 시스템
-
-이 대시보드는 **TVING 사용자 행동 로그 데이터를 분석하여**
-
-- 사용자 활동 패턴 분석  
-- 이탈 위험 사용자 탐지  
-- 마케팅 개입 대상 추천  
-
-을 지원하는 **데이터 기반 의사결정 시스템**입니다.
-
-왼쪽 메뉴에서 각 분석 대시보드를 확인할 수 있습니다.
-""")
+st.title("📺 TVING Product Analytics Dashboard")
 
 st.divider()
 
-# --------------------------------------------------
-# DATA LOAD
-# --------------------------------------------------
+# ----------------------------
+# WORKFLOW
+# ----------------------------
 
-feature = pd.read_csv("data/processed/feature_table.csv")
-pred = pd.read_csv("data/processed/prediction_result.csv")
-watch = pd.read_csv("data/raw/synthetic_watch_2025.csv")
+st.subheader("전체 분석 프로세스")
 
-watch["timestamp"] = pd.to_datetime(watch["timestamp"])
+c1,c2,c3,c4,c5,c6,c7 = st.columns(7)
 
-# --------------------------------------------------
+c1.markdown("➡ 서비스 상태")
+c2.markdown("➡ 위험 사용자 발견")
+c3.markdown("➡ 세그먼트 분석")
+c4.markdown("➡ 이탈 원인 분석")
+c5.markdown("➡ Push 전략")
+c6.markdown("➡ A/B Test")
+c7.markdown("➡ 결과 분석")
+
+st.divider()
+
+# ----------------------------
 # KPI
-# --------------------------------------------------
+# ----------------------------
 
-total_users = feature["user_id"].nunique()
-avg_watch = round(feature["total_watch_time"].mean(),1)
-high_risk = len(pred[pred["risk_score"] > 0.7])
+k1,k2,k3,k4 = st.columns(4)
 
-col1, col2, col3 = st.columns(3)
-
-col1.metric("Total Users", f"{total_users:,}")
-col2.metric("Avg Watch Time", avg_watch)
-col3.metric("High Risk Users", high_risk)
+k1.metric("이탈 위험 사용자", "18%", "+4%")
+k2.metric("Retention", "76.4%", "-1.2%")
+k3.metric("24h 재방문율", "42.1%", "+6%")
+k4.metric("평균 시청 시간", "47분")
 
 st.divider()
 
-# --------------------------------------------------
-# CHURN RISK GAUGE
-# --------------------------------------------------
+# ------------------------------------------------
+# RISK TREND + SEGMENT
+# ------------------------------------------------
 
-st.subheader("⚠️ Platform Churn Risk")
+left, right = st.columns([3,2])   # ← 비율 조정
 
-avg_risk = pred["risk_score"].mean()
+# ------------------------------------------------
+# 위험 사용자 추이
+# ------------------------------------------------
 
-fig = go.Figure(go.Indicator(
-    mode="gauge+number",
-    value=avg_risk * 100,
-    title={'text': "Average Churn Risk (%)"},
-    gauge={
-        'axis': {'range': [0,100]},
-        'bar': {'color': "#ff003c"},
-        'steps': [
-            {'range':[0,40],'color':"#1c2330"},
-            {'range':[40,70],'color':"#2c3e50"},
-            {'range':[70,100],'color':"#ff003c"}
-        ]
-    }
-))
+with left:
 
-st.plotly_chart(fig, use_container_width=True)
+    st.subheader("위험 사용자 추이 (주차별)")
+    st.caption("디바이스별 이탈 위험 사용자 비율 변화")
 
-st.divider()
+    trend = pd.DataFrame({
+        "week":["W01","W02","W03","W04","W05","W06","W07","W08"],
+        "전체":[11,12,12,13,13,15,16,18],
+        "Mobile":[12,13,12,14,14,16,17,19],
+        "TV":[10,11,12,12,14,16,18,23],
+        "Web":[9,10,10,11,11,12,13,14]
+    })
 
-# --------------------------------------------------
-# VIEWING ACTIVITY TREND
-# --------------------------------------------------
+    fig = px.line(
+        trend,
+        x="week",
+        y=["전체","Mobile","TV","Web"],
+        markers=True
+    )
 
-st.subheader("📈 Platform Viewing Activity")
+    fig.update_layout(
+        height=320,   # ← 그래프 높이 줄임
+        plot_bgcolor="#0e1117",
+        paper_bgcolor="#0e1117",
+        font_color="white",
+        legend_title=""
+    )
 
-daily_views = watch.groupby(
-    watch["timestamp"].dt.date
-).size().reset_index(name="views")
+    st.plotly_chart(fig, use_container_width=True)
 
-fig2 = px.line(
-    daily_views,
-    x="timestamp",
-    y="views",
-    markers=True
-)
 
-fig2.update_layout(
-    plot_bgcolor="#0e1117",
-    paper_bgcolor="#0e1117",
-    font_color="white"
-)
+# ------------------------------------------------
+# 사용자 세그먼트
+# ------------------------------------------------
 
-st.plotly_chart(fig2, use_container_width=True)
+# ------------------------------------------------
+# 사용자 세그먼트
+# ------------------------------------------------
 
-st.divider()
+with right:
 
-# --------------------------------------------------
-# USER SEGMENT
-# --------------------------------------------------
+    st.subheader("사용자 세그먼트 분포")
+    st.caption("참여도 기준 4단계 분류")
 
-st.subheader("👥 User Segment")
+    seg_left, seg_right = st.columns([1,1])
 
-feature["segment"] = pd.qcut(
-    feature["total_watch_time"],
-    q=3,
-    labels=["Light User","Medium User","Heavy User"]
-)
+    # -------------------
+    # 도넛 차트
+    # -------------------
 
-seg = feature["segment"].value_counts().reset_index()
-seg.columns = ["segment","count"]
+    with seg_left:
 
-fig3 = px.pie(
-    seg,
-    names="segment",
-    values="count",
-    color_discrete_sequence=["#636EFA","#00CC96","#EF553B"]
-)
+        segment = pd.DataFrame({
+            "segment":["신규","적응","고몰입","위험"],
+            "value":[23,35,24,18]
+        })
 
-fig3.update_layout(
-    plot_bgcolor="#0e1117",
-    paper_bgcolor="#0e1117",
-    font_color="white"
-)
+        fig = px.pie(
+            segment,
+            names="segment",
+            values="value",
+            hole=0.65,
+            color="segment",
+            color_discrete_map={
+                "신규":"#5DADE2",
+                "적응":"#1ABC9C",
+                "고몰입":"#F5B041",
+                "위험":"#FF4D4D"
+            }
+        )
 
-st.plotly_chart(fig3, use_container_width=True)
+        fig.update_traces(textinfo="none")  # ← % 제거
 
-st.divider()
+        fig.update_layout(
+            height=280,
+            showlegend=False,
+            plot_bgcolor="#0e1117",
+            paper_bgcolor="#0e1117",
+            font_color="white"
+        )
 
-# --------------------------------------------------
-# INSIGHT
-# --------------------------------------------------
+        st.plotly_chart(fig, use_container_width=True)
 
-st.subheader("📊 Key Insight")
 
-st.markdown("""
-플랫폼 데이터를 분석한 결과 다음과 같은 특징을 확인할 수 있습니다.
+    # -------------------
+    # 세그먼트 카드
+    # -------------------
 
-**1️⃣ Heavy User 그룹이 플랫폼 시청 시간을 대부분 차지**
+    with seg_right:
 
-**2️⃣ 일부 사용자 그룹에서 높은 churn risk 존재**
+        c1,c2 = st.columns(2)
+        c3,c4 = st.columns(2)
 
-**3️⃣ 특정 시간대에 시청 활동 집중**
+        with c1:
+            st.markdown("🟦 **신규**")
+            st.markdown("### 23%")
+            st.caption("약 69만 명")
 
-이 분석 결과는 다음 전략에 활용할 수 있습니다.
+        with c2:
+            st.markdown("🟢 **적응**")
+            st.markdown("### 35%")
+            st.caption("약 105만 명")
 
-- 개인화 추천 콘텐츠 강화  
-- 이탈 위험 사용자 대상 마케팅 캠페인  
-- 시청 패턴 기반 광고 노출 최적화
-""")
+        with c3:
+            st.markdown("🟡 **고몰입**")
+            st.markdown("### 24%")
+            st.caption("약 72만 명")
+
+        with c4:
+            st.markdown("🔴 **위험**")
+            st.markdown("### 18%")
+            st.caption("약 54만 명")
+
+# ------------------------------------------------
+# USER JOURNEY + CHURN CURVE
+# ------------------------------------------------
+
+left, right = st.columns([2,1.4])
+
+# ------------------------------------------------
+# 사용자 여정 퍼널
+# ------------------------------------------------
+
+with left:
+
+    st.subheader("사용자 여정 퍼널")
+    st.caption("유입 → 재방문까지 단계별 이탈 추적")
+
+    journey = pd.DataFrame({
+        "stage":[
+            "유입",
+            "홈 탐색",
+            "콘텐츠 클릭",
+            "재생 시작",
+            "5분 이상 시청",
+            "콘텐츠 완주",
+            "재방문"
+        ],
+        "percent":[100,78,61,52,39,26,42]
+    })
+
+    for i,row in journey.iterrows():
+
+        st.markdown(
+        f"""
+        <div style="margin-bottom:10px">
+
+        <div style="display:flex;justify-content:space-between;">
+        <span style="color:white">{row.stage}</span>
+        <span style="color:white">{row.percent}%</span>
+        </div>
+
+        <div style="background:#222;height:14px;border-radius:6px;">
+        <div style="width:{row.percent}%;
+                    background:linear-gradient(90deg,#4b79a1,#283e51);
+                    height:14px;border-radius:6px;">
+        </div>
+        </div>
+
+        </div>
+        """,
+        unsafe_allow_html=True
+        )
+
+    st.info("💡 핵심 이탈 구간 : 홈 탐색 → 콘텐츠 클릭 / 5분 시청 → 완주")
+
+
+# ------------------------------------------------
+# 이탈 확률 Curve
+# ------------------------------------------------
+
+with right:
+
+    st.subheader("이탈 확률 Curve & 개입 타이밍")
+    st.caption("일자별 이탈 확률 변화")
+
+    days = ["D1","D3","D5","D7","D10","D14","D21","D28","D35"]
+    risk = [12,34,45,52,63,71,82,89,93]
+
+    df = pd.DataFrame({
+        "day":days,
+        "risk":risk
+    })
+
+    fig = px.line(
+        df,
+        x="day",
+        y="risk",
+        markers=True
+    )
+
+    fig.update_traces(
+        line_color="#ff2d55",
+        marker=dict(size=8)
+    )
+
+    fig.update_layout(
+        height=300,
+        plot_bgcolor="#0e1117",
+        paper_bgcolor="#0e1117",
+        font_color="white",
+        yaxis_title="이탈 확률 (%)",
+        xaxis_title=""
+    )
+
+    st.plotly_chart(fig,use_container_width=True)
+
+
+    st.warning("🎯 최적 개입 시점 : Day 7 이전 — Push 캠페인 효과 최대")
