@@ -260,10 +260,3 @@ with right:
     )
 
     st.plotly_chart(fig,use_container_width=True)
-
-
-<<<<<<< HEAD
-    st.warning("🎯 최적 개입 시점 : Day 7 이전 — Push 캠페인 효과 최대")
-=======
-    st.warning("🎯 최적 개입 시점 : Day 7 이전 — Push 캠페인 효과 최대")
->>>>>>> f5d9d226b75825793f387768736c0a1fac8ed033
